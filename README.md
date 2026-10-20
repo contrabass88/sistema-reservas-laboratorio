@@ -6,6 +6,8 @@
 
 **Materia:** Tópicos Avanzados
 
+**Profesor:**  Emanuel Irrazabal
+
 ---
 
 ## 1. Especificación Breve
