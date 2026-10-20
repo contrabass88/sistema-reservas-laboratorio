@@ -2,6 +2,7 @@ import unittest
 from uuid import UUID
 
 from src.models import Reservation, load_inventory
+from src import models
 
 
 class InventoryTests(unittest.TestCase):
@@ -78,6 +79,72 @@ class ReservationTests(unittest.TestCase):
     def test_mixed_timezone_awareness_is_rejected_with_value_error(self):
         with self.assertRaises(ValueError):
             self.make_reservation(end_time="2026-10-20T11:00:00+00:00")
+
+
+class TestOverlaps(unittest.TestCase):
+    def setUp(self):
+        self.existing = self.make_reservation("10:00", "11:00")
+
+    def make_reservation(self, start, end, unit_id="MIC-01", separator="T"):
+        return Reservation(
+            unit_id=unit_id,
+            requester="Ana",
+            start_time=f"2026-10-20{separator}{start}:00",
+            end_time=f"2026-10-20{separator}{end}:00",
+        )
+
+    def test_direct_overlap_is_detected_on_both_sides(self):
+        for start, end in (("09:30", "10:30"), ("10:30", "11:30")):
+            with self.subTest(start=start, end=end):
+                new_res = self.make_reservation(start, end)
+                self.assertTrue(models.check_overlap(new_res, [self.existing]))
+
+    def test_contained_intervals_are_detected_in_both_directions(self):
+        for start, end in (("10:15", "10:45"), ("09:00", "12:00")):
+            with self.subTest(start=start, end=end):
+                new_res = self.make_reservation(start, end)
+                self.assertTrue(models.check_overlap(new_res, [self.existing]))
+
+    def test_identical_intervals_on_same_unit_overlap(self):
+        new_res = self.make_reservation("10:00", "11:00")
+        self.assertTrue(models.check_overlap(new_res, [self.existing]))
+
+    def test_exact_consecutive_boundaries_are_allowed_in_both_directions(self):
+        for start, end in (("09:00", "10:00"), ("11:00", "12:00")):
+            with self.subTest(start=start, end=end):
+                new_res = self.make_reservation(start, end)
+                self.assertFalse(models.check_overlap(new_res, [self.existing]))
+
+    def test_simultaneous_reservations_on_different_units_are_allowed(self):
+        new_res = self.make_reservation("10:00", "11:00", unit_id="MIC-02")
+        self.assertFalse(models.check_overlap(new_res, [self.existing]))
+
+    def test_separated_intervals_are_allowed(self):
+        for start, end in (("08:00", "09:00"), ("12:00", "13:00")):
+            with self.subTest(start=start, end=end):
+                new_res = self.make_reservation(start, end)
+                self.assertFalse(models.check_overlap(new_res, [self.existing]))
+
+    def test_empty_list_has_no_overlap(self):
+        self.assertFalse(models.check_overlap(self.existing, []))
+
+    def test_cancelled_reservation_does_not_block(self):
+        self.existing.status = "CANCELLED"
+        new_res = self.make_reservation("10:00", "11:00")
+        self.assertFalse(models.check_overlap(new_res, [self.existing]))
+
+    def test_conflict_after_non_conflicting_reservation_is_detected(self):
+        other_unit = self.make_reservation("10:00", "11:00", unit_id="MIC-02")
+        new_res = self.make_reservation("10:30", "11:30")
+        reservations = [other_unit, self.existing]
+        before = [vars(res).copy() for res in [new_res, *reservations]]
+        self.assertTrue(models.check_overlap(new_res, reservations))
+        self.assertEqual(reservations, [other_unit, self.existing])
+        self.assertEqual([vars(res) for res in [new_res, *reservations]], before)
+
+    def test_mixed_iso_formats_are_compared_chronologically(self):
+        new_res = self.make_reservation("10:30", "11:30", separator=" ")
+        self.assertTrue(models.check_overlap(new_res, [self.existing]))
 
 
 if __name__ == "__main__":

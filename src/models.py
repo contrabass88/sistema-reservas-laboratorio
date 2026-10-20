@@ -51,3 +51,20 @@ class Reservation:
             raise ValueError("Las fechas deben usar zonas horarias compatibles") from error
         if not valid_interval:
             raise ValueError("El inicio debe ser estrictamente anterior al fin")
+
+
+def check_overlap(new_res: Reservation, active_reservations: list[Reservation]) -> bool:
+    """Indica si hay una colisión con una reserva ACTIVE de la misma unidad.
+
+    Compara intervalos semiabiertos [inicio, fin): los límites consecutivos
+    están permitidos. No modifica las reservas ni realiza operaciones de E/S.
+    Las fechas comparadas deben tener zonas horarias compatibles.
+    """
+    start = _parse_time(new_res.start_time)
+    end = _parse_time(new_res.end_time)
+    for reservation in active_reservations:
+        if reservation.status != "ACTIVE" or reservation.unit_id != new_res.unit_id:
+            continue
+        if start < _parse_time(reservation.end_time) and _parse_time(reservation.start_time) < end:
+            return True
+    return False
