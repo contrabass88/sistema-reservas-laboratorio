@@ -53,3 +53,56 @@ La especificación base y el inventario estático fueron documentados en la inic
    \`\`\`bash
 
    python -m unittest discover -s tests -v
+   ```
+
+3. Uso programático de la capa de servicio (la CLI de `src/cli.py` figura en la estructura autorizada pero **aún no está implementada**):
+
+   ```python
+   from src.service import Service
+
+   svc = Service()  # persiste en data/reservations.json
+   r = svc.create_reservation("MIC-01", "Ana", "2026-10-26T10:00:00", "2026-10-26T11:00:00")
+   svc.cancel_reservation(r.id)  # borrado lógico: status = "CANCELLED"
+   ```
+
+**Estructura del proyecto:**
+
+```text
+data/inventory.json         Inventario estático (5 equipos, solo lectura)
+data/reservations.json      Persistencia de reservas (se genera al usar el servicio)
+src/models.py               Entidades, validaciones y check_overlap
+src/storage.py              Lectura y escritura atómica JSON
+src/service.py              Creación y cancelación de reservas
+tests/                      35 pruebas (models, storage, service)
+docs/episodes/              Trazabilidad por episodio
+PROGRESS.md                 Bitácora, verificación y decisiones
+```
+
+**Resultados de verificación:**
+
+| Verificación | Resultado |
+|---|---|
+| `python -m unittest discover -s tests -v` | 35 tests, OK |
+| Pruebas de dominio (`test_reservations.py`) | 20 |
+| Pruebas de persistencia (`test_storage.py`) | 7 |
+| Pruebas de servicio (`test_service.py`) | 8 |
+
+---
+
+## 3. Preparación del Agente
+
+El comportamiento del agente se delimita en `AGENTS.md`: Python 3.12 con librería estándar, metodología TDD (pruebas antes que lógica de negocio), IDs de inventario inmutables, borrado lógico y comparación horaria con intervalos semiabiertos.
+
+---
+
+## 4. Registro de Decisiones y Episodios
+
+| Episodio | Objetivo | Commit | Detalle |
+|---|---|---|---|
+| 1 | Modelado de inventario y validación de entidades | `98c7f22` | [docs/episodes/episodio-1.md](docs/episodes/episodio-1.md) |
+| 2 | Superposición y límites consecutivos | `51da897` | [docs/episodes/episodio-2.md](docs/episodes/episodio-2.md) |
+| 3 | Persistencia atómica JSON y capa de servicio | `f05e8e0` | [docs/episodes/episodio-3.md](docs/episodes/episodio-3.md) |
+
+Bitácora completa y decisiones técnicas en [PROGRESS.md](PROGRESS.md).
+
+**Limitaciones:** sin interfaz (CLI pendiente), sin autenticación, sin concurrencia entre procesos (único escritor), sin administración de inventario ni despliegue en la nube.
